@@ -1,14 +1,14 @@
 import string
 from nltk.corpus import stopwords
 import string
-import spacy
+#import spacy
 import json
 import string
 import pandas as pd
-from num2words import num2words
+#from num2words import num2words
 import re
 from nltk.stem.snowball import SnowballStemmer
-from unidecode import unidecode
+#from unidecode import unidecode
 from tqdm import tqdm
 from nltk.collocations import TrigramCollocationFinder, TrigramAssocMeasures
 
@@ -47,12 +47,15 @@ def clean_doc(doc):
 
 
 # load the document
-col_list = ["review", "sentiment", "sum positive", "sum negative"]
-text = pd.read_csv("IMBD Dataset.csv", usecols = col_list)
+col_list = ["review", "sentiment"]
+text = pd.read_csv("IMDB Dataset.csv", usecols = col_list)
+print(text["review"][0])
+tokens = clean_doc(text["review"][0])
+print(tokens)
 #filename = 'C:\Users\User\PycharmProjects\NN_sentiment_analysis\IMDB Dataset.csv'
 #text = load_doc(filename)
-tokens = clean_doc(text)
-print(tokens)
+#tokens = clean_doc(text)
+#print(tokens)
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
