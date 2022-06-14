@@ -8,6 +8,9 @@ import re
 
 from tqdm import tqdm
 from nltk.collocations import TrigramCollocationFinder, TrigramAssocMeasures
+from unidecode import unidecode
+import spacy
+nlp = spacy.load('en_core_web_sm')
 
 
 def print_hi(name):
@@ -15,15 +18,8 @@ def print_hi(name):
 	print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
 
 
-# load doc into memory
-def load_doc(filename):
-	# open the file as read only
-	file = open(filename, 'r')
-	# read all text
-	text = file.read()
-	# close the file
-	file.close()
-	return text
+def lemmatization(file):
+	return [word.lemma_ for word in nlp(' '.join(file))]
 
 #code taken from https://medium.com/analytics-vidhya/data-preparation-and-text-preprocessing-on-amazon-fine-food-reviews-7b7a2665c3f4
 def decontracted(phrase):
@@ -65,14 +61,14 @@ def clean_doc(doc):
 # load the document
 col_list = ["review", "sentiment"]
 text = pd.read_csv("IMDB Dataset.csv", usecols=col_list)
-print(text["review"][0])
-tokens = clean_doc(text["review"][0])
+file = text["review"][0]
+# to lowercase:
+file = unidecode(file.lower())
+#extract lemma:
+file = lemmatization(file)
+tokens = clean_doc(file)
 print(tokens)
 
-# filename = 'C:\Users\User\PycharmProjects\NN_sentiment_analysis\IMDB Dataset.csv'
-# text = load_doc(filename)
-# tokens = clean_doc(text)
-# print(tokens)
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
