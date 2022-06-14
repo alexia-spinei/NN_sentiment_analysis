@@ -4,6 +4,7 @@ import string
 import json
 import string
 import pandas as pd
+import re
 
 from tqdm import tqdm
 from nltk.collocations import TrigramCollocationFinder, TrigramAssocMeasures
@@ -24,22 +25,40 @@ def load_doc(filename):
 	file.close()
 	return text
 
+#code taken from https://medium.com/analytics-vidhya/data-preparation-and-text-preprocessing-on-amazon-fine-food-reviews-7b7a2665c3f4
+def decontracted(phrase):
+	phrase = re.sub(r"won't", "will not", phrase)
+	phrase = re.sub(r"can't", "can not", phrase)
+	phrase = re.sub(r"n\'t", " not", phrase)
+	phrase = re.sub(r"\'re", " are", phrase)
+	phrase = re.sub(r"\'s", " is", phrase)
+	phrase = re.sub(r"\'d", " would", phrase)
+	phrase = re.sub(r"\'ll", " will", phrase)
+	phrase = re.sub(r"\'t", " not", phrase)
+	phrase = re.sub(r"\'ve", " have", phrase)
+	phrase = re.sub(r"\'m", " am", phrase)
+	phrase = re.sub(r"<br />", " ", phrase) #added to get rid of the line breaks
+
+	return phrase
 
 def clean_doc(doc):
+	# remove abbreviations and line breaks
+	doc = decontracted(doc)
 	# split into tokens by white space
 	tokens = doc.split()
 	# remove punctuation from each token
 	table = str.maketrans('', '', string.punctuation)
-	tokens = [w.translate(table) for w in tokens]
+	tokens = [word.translate(table) for word in tokens]
+	# remove capitalization
+	tokens = [word.lower() for word in tokens]
 	# remove remaining tokens that are not alphabetic
 	tokens = [word for word in tokens if word.isalpha()]
 	# filter out stop words
 	stop_words = set(stopwords.words('english'))
-	tokens = [w for w in tokens if not w in stop_words]
+	tokens = [word for word in tokens if not word in stop_words]
 	# filter out short tokens
 	tokens = [word for word in tokens if len(word) > 1]
-	# remove capitalization
-	tokens = [word.lower() for word in tokens]
+
 	return tokens
 
 
