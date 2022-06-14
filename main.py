@@ -1,6 +1,5 @@
 import string
 from nltk.corpus import stopwords
-import string
 import json
 import string
 import pandas as pd
@@ -21,7 +20,7 @@ def print_hi(name):
 def lemmatization(file):
 	return [word.lemma_ for word in nlp(' '.join(file))]
 
-#code taken from https://medium.com/analytics-vidhya/data-preparation-and-text-preprocessing-on-amazon-fine-food-reviews-7b7a2665c3f4
+# code taken from https://medium.com/analytics-vidhya/data-preparation-and-text-preprocessing-on-amazon-fine-food-reviews-7b7a2665c3f4
 def decontracted(phrase):
 	phrase = re.sub(r"won't", "will not", phrase)
 	phrase = re.sub(r"can't", "can not", phrase)
@@ -33,7 +32,7 @@ def decontracted(phrase):
 	phrase = re.sub(r"\'t", " not", phrase)
 	phrase = re.sub(r"\'ve", " have", phrase)
 	phrase = re.sub(r"\'m", " am", phrase)
-	phrase = re.sub(r"<br />", " ", phrase) #added to get rid of the line breaks
+	phrase = re.sub(r"<br />", " ", phrase)  # added to get rid of the line breaks
 
 	return phrase
 
@@ -45,8 +44,6 @@ def clean_doc(doc):
 	# remove punctuation from each token
 	table = str.maketrans('', '', string.punctuation)
 	tokens = [word.translate(table) for word in tokens]
-	# remove capitalization
-	tokens = [word.lower() for word in tokens]
 	# remove remaining tokens that are not alphabetic
 	tokens = [word for word in tokens if word.isalpha()]
 	# filter out stop words
@@ -62,10 +59,11 @@ def clean_doc(doc):
 col_list = ["review", "sentiment"]
 text = pd.read_csv("IMDB Dataset.csv", usecols=col_list)
 file = text["review"][0]
+print(file)
 # to lowercase:
 file = unidecode(file.lower())
-#extract lemma:
-file = lemmatization(file)
+# extract lemma:
+#file = lemmatization(file)
 tokens = clean_doc(file)
 print(tokens)
 
