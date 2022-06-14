@@ -38,6 +38,8 @@ def clean_doc(doc):
 	tokens = [w for w in tokens if not w in stop_words]
 	# filter out short tokens
 	tokens = [word for word in tokens if len(word) > 1]
+	# remove capitalization
+	tokens = [word.lower() for word in tokens]
 	return tokens
 
 
