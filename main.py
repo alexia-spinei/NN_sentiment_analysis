@@ -2,6 +2,7 @@ import string
 
 import nltk
 from nltk.corpus import stopwords
+from nltk.corpus import wordnet
 import json
 import string
 import pandas as pd
@@ -20,10 +21,20 @@ def print_hi(name):
 	print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
 
 
+def get_wordnet_pos(word):
+    """Map POS tag to first character lemmatize() accepts"""
+    tag = nltk.pos_tag([word])[0][1][0].upper()
+    tag_dict = {"J": wordnet.ADJ,
+                "N": wordnet.NOUN,
+                "V": wordnet.VERB,
+                "R": wordnet.ADV}
+
+    return tag_dict.get(tag, wordnet.NOUN)
+
+
 def lemmatization(file):
-	tokenized = nltk.word_tokenize(file)
 	words = []
-	for t in tokenized:
+	for t in file:
 		words.append(nlp.lemmatize(t))
 	return " ".join(words)
 
@@ -43,6 +54,7 @@ def decontracted(phrase):
 
 	return phrase
 
+# source: https://machinelearningmastery.com/deep-learning-bag-of-words-model-sentiment-analysis/
 def clean_doc(doc):
 	# remove abbreviations and line breaks
 	doc = decontracted(doc)
@@ -69,10 +81,15 @@ file = text["review"][0]
 print(file)
 # to lowercase:
 file = unidecode(file.lower())
-# extract lemma:
-file = lemmatization(file)
+# clean the doc
 tokens = clean_doc(file)
-print(tokens)
+# extract lemmas:
+lemma = []
+for w in tokens:
+	w = nlp.lemmatize(w, get_wordnet_pos(w))
+	lemma.append(w)
+print(lemma)
+
 
 
 # Press the green button in the gutter to run the script.
