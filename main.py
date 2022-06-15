@@ -104,15 +104,13 @@ def writeToFile(dictionary):
 col_list = ["review", "sentiment"]
 text = pd.read_csv("IMDB Dataset.csv", usecols=col_list)
 dic = dict()
-lemma = []
-for i in range(0,5000):
-	file =text["review"][i]
+for i in range(0,50000):
+	file = text["review"][i]
 	tokens = clean_doc(file)
-	for w in tokens:
-		w = nlp.lemmatize(w, get_wordnet_pos(w))
-		lemma.append(w)
-	dictionary(lemma, dic)
-
+	#for w in tokens:
+	#	w = nlp.lemmatize(w, get_wordnet_pos(w))
+	#	dictionary(w, dic)
+	dictionary(tokens, dic)
 writeToFile(dic)
 # clean the doc
 # extract lemmas:
