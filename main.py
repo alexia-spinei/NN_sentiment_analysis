@@ -1,6 +1,9 @@
+import re
 import string
 
 import nltk
+import pandas as pd
+from nltk import WordNetLemmatizer
 from nltk.corpus import stopwords
 from nltk.corpus import wordnet
 import json
@@ -11,8 +14,7 @@ import re
 from tqdm import tqdm
 from nltk.collocations import TrigramCollocationFinder, TrigramAssocMeasures
 from unidecode import unidecode
-import spacy
-from nltk.stem import WordNetLemmatizer
+
 nlp = WordNetLemmatizer()
 
 
@@ -33,12 +35,15 @@ def get_wordnet_pos(word):
 
 
 def lemmatization(file):
+	tokenized = nltk.word_tokenize(file)
 	words = []
 	for t in file:
 		words.append(nlp.lemmatize(t))
 	return " ".join(words)
 
 # code taken from https://medium.com/analytics-vidhya/data-preparation-and-text-preprocessing-on-amazon-fine-food-reviews-7b7a2665c3f4
+
+
 def decontracted(phrase):
 	phrase = re.sub(r"won't", "will not", phrase)
 	phrase = re.sub(r"can't", "can not", phrase)
@@ -57,6 +62,7 @@ def decontracted(phrase):
 # source: https://machinelearningmastery.com/deep-learning-bag-of-words-model-sentiment-analysis/
 def clean_doc(doc):
 	# remove abbreviations and line breaks
+	doc = unidecode(doc.lower())
 	doc = decontracted(doc)
 	# split into tokens by white space
 	tokens = doc.split()
@@ -74,21 +80,44 @@ def clean_doc(doc):
 	return tokens
 
 
+def dictionary(file, dic):
+	for word in file:
+		if word not in dic:
+			dic[word] = 1
+		else:
+			dic[word] = dic[word]+1
+	# dic2 = dict(sorted(dic.items(),reverse=True, key=lambda x: x[1]))
+	# for key in list(dic2.keys()):
+	# 	with open("counts-dracula.txt", "a") as f:
+	# 		print(key, '\t', dic2[key], file = f)
+	# f.close()
+
+
+def writeToFile(dictionary):
+	dic = dict(sorted(dictionary.items(), reverse=True, key = lambda x: x[1]))
+	for key in list(dic.keys()):
+		with open("vocabulary.txt", "a") as f:
+			print(key, '\t', dic[key], file = f)
+	f.close()
+
 # load the document
 col_list = ["review", "sentiment"]
 text = pd.read_csv("IMDB Dataset.csv", usecols=col_list)
-file = text["review"][0]
-print(file)
-# to lowercase:
-file = unidecode(file.lower())
-# clean the doc
-tokens = clean_doc(file)
-# extract lemmas:
+dic = dict()
 lemma = []
-for w in tokens:
-	w = nlp.lemmatize(w, get_wordnet_pos(w))
-	lemma.append(w)
-print(lemma)
+for i in range(0,5000):
+	file =text["review"][i]
+	tokens = clean_doc(file)
+	for w in tokens:
+		w = nlp.lemmatize(w, get_wordnet_pos(w))
+		lemma.append(w)
+	dictionary(lemma, dic)
+
+writeToFile(dic)
+# clean the doc
+# extract lemmas:
+
+#print(lemma)
 
 
 
