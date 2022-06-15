@@ -1,4 +1,6 @@
 import string
+
+import nltk
 from nltk.corpus import stopwords
 import json
 import string
@@ -9,7 +11,8 @@ from tqdm import tqdm
 from nltk.collocations import TrigramCollocationFinder, TrigramAssocMeasures
 from unidecode import unidecode
 import spacy
-nlp = spacy.load('en_core_web_sm')
+from nltk.stem import WordNetLemmatizer
+nlp = WordNetLemmatizer()
 
 
 def print_hi(name):
@@ -18,7 +21,11 @@ def print_hi(name):
 
 
 def lemmatization(file):
-	return [word.lemma_ for word in nlp(' '.join(file))]
+	tokenized = nltk.word_tokenize(file)
+	words = []
+	for t in tokenized:
+		words.append(nlp.lemmatize(t))
+	return " ".join(words)
 
 # code taken from https://medium.com/analytics-vidhya/data-preparation-and-text-preprocessing-on-amazon-fine-food-reviews-7b7a2665c3f4
 def decontracted(phrase):
@@ -63,7 +70,7 @@ print(file)
 # to lowercase:
 file = unidecode(file.lower())
 # extract lemma:
-#file = lemmatization(file)
+file = lemmatization(file)
 tokens = clean_doc(file)
 print(tokens)
 
