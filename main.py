@@ -110,7 +110,14 @@ for i in range(0,10):
 		w = nlp.lemmatize(w, get_wordnet_pos(w))
 		lemmas.append(w)
 	dictionary(lemmas, dic)
-writeToFile(dic)
+# remove word with low occurrence
+min_frequency = 2
+final_dic = dict()
+for word in dic:
+	if dic[word] >= min_frequency:
+		final_dic[word] = dic[word]
+print(final_dic)
+#writeToFile(final_dic)
 
 
 
