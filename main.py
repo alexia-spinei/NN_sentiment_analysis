@@ -1,6 +1,4 @@
 import re
-import string
-
 import nltk
 import pandas as pd
 from nltk import WordNetLemmatizer
@@ -104,18 +102,15 @@ def writeToFile(dictionary):
 col_list = ["review", "sentiment"]
 text = pd.read_csv("IMDB Dataset.csv", usecols=col_list)
 dic = dict()
-for i in range(0,50000):
+for i in range(0,10):
 	file = text["review"][i]
 	tokens = clean_doc(file)
-	#for w in tokens:
-	#	w = nlp.lemmatize(w, get_wordnet_pos(w))
-	#	dictionary(w, dic)
-	dictionary(tokens, dic)
+	lemmas = []
+	for w in tokens:
+		w = nlp.lemmatize(w, get_wordnet_pos(w))
+		lemmas.append(w)
+	dictionary(lemmas, dic)
 writeToFile(dic)
-# clean the doc
-# extract lemmas:
-
-#print(lemma)
 
 
 
