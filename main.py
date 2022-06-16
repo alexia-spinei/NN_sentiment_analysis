@@ -62,11 +62,11 @@ def clean_doc(doc):
 	# remove abbreviations and line breaks
 	doc = unidecode(doc.lower())
 	doc = decontracted(doc)
+	# remove punctuation from each token
+	for char in string.punctuation:
+		doc = doc.replace(char, ' ')
 	# split into tokens by white space
 	tokens = doc.split()
-	# remove punctuation from each token
-	table = str.maketrans('', '', string.punctuation)
-	tokens = [word.translate(table) for word in tokens]
 	# remove remaining tokens that are not alphabetic
 	tokens = [word for word in tokens if word.isalpha()]
 	# filter out stop words
