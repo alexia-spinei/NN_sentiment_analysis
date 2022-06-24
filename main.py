@@ -102,7 +102,7 @@ def writeToFile(dictionary):
 col_list = ["review", "sentiment"]
 text = pd.read_csv("IMDB Dataset.csv", usecols=col_list)
 dic = dict()
-for i in range(0,10):
+for i in range(0,6000):
 	file = text["review"][i]
 	tokens = clean_doc(file)
 	lemmas = []
@@ -116,8 +116,8 @@ final_dic = dict()
 for word in dic:
 	if dic[word] >= min_frequency:
 		final_dic[word] = dic[word]
-print(final_dic)
-#writeToFile(final_dic)
+
+writeToFile(final_dic)
 
 
 
