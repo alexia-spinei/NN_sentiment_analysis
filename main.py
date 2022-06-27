@@ -9,6 +9,7 @@ from nltk.corpus import wordnet
 import json
 import string
 import pandas as pd
+from numpy import array
 from tqdm import tqdm
 from nltk.collocations import TrigramCollocationFinder, TrigramAssocMeasures
 from unidecode import unidecode
@@ -96,43 +97,75 @@ def writeToFile(dictionary,name):
 	dic = dict(sorted(dictionary.items(), reverse=True, key = lambda x: x[1]))
 	for key in list(dic.keys()):
 		with open(name+".txt", "a") as f:
-			print(key, '\t', dic[key], file = f)
+			print(key, '\t', file = f)
 	f.close()
 
-
-def process_docs(text):
-	for i in range(0,10):
+def buildVocabulary(text):
+	dic = dict()
+	for i in range(0, 3000):
 		file = text["review"][i]
 		tokens = clean_doc(file)
+		lemmas = []
+		for w in tokens:
+			w = nlp.lemmatize(w, get_wordnet_pos(w))
+			lemmas.append(w)
+		dictionary(lemmas, dic)
+	for i in range(25002, 28002):
+		file = text["review"][i]
+		tokens = clean_doc(file)
+		lemmas = []
+		for w in tokens:
+			w = nlp.lemmatize(w, get_wordnet_pos(w))
+			lemmas.append(w)
+		dictionary(lemmas, dic)
+	# remove word with low occurrence
+	min_frequency = 2
+	final_dic = dict()
+	for word in dic:
+		if dic[word] >= min_frequency:
+			final_dic[word] = dic[word]
+	writeToFile(final_dic, "vocabulary")
+
+def process_docs(text, vocab):
+	for i in range(0,3000):
+		file = text["review"][i]
+		tokens = clean_doc(file)
+		tokens = [w for w in tokens if w in vocab]
 		line = ' '.join(tokens)
-		if text["sentiment"][i] == "positive":
-			positive_lines.append(line)
-		else:
-			negative_lines.append(line)
+		negative_lines.append(line)
+	for i in range(25002, 28002):
+		file = text["review"][i]
+		tokens = clean_doc(file)
+		tokens = [w for w in tokens if w in vocab]
+		line = ' '.join(tokens)
+		positive_lines.append(line)
+
+
+def process_test_data(text, vocab):
+	for i in range(3001, 4001):
+		file = text["review"][i]
+		tokens = clean_doc(file)
+		tokens = [w for w in tokens if w in vocab]
+		line = ' '.join(tokens)
+		negative_lines.append(line)
+	for i in range(28003, 29003):
+		file = text["review"][i]
+		tokens = clean_doc(file)
+		tokens = [w for w in tokens if w in vocab]
+		line = ' '.join(tokens)
+		positive_lines.append(line)
+
 
 # load the document
 col_list = ["review", "sentiment"]
 text = pd.read_csv("IMDB Dataset.csv", usecols=col_list)
-process_docs(text)
-dic = dict()
-lines = list()
-for i in range(0,10):
-	file = text["review"][i]
-	tokens = clean_doc(file)
-	line = ' '.join(tokens)
-	lemmas = []
-	for w in tokens:
-		w = nlp.lemmatize(w, get_wordnet_pos(w))
-		lemmas.append(w)
-	dictionary(lemmas, dic)
-# remove word with low occurrence
-min_frequency = 2
-final_dic = dict()
-# for word in dic:
-# 	if dic[word] >= min_frequency:
-# 		final_dic[word] = dic[word]
-#writeToFile(final_dic, "vocabulary")
-
+#buildVocabulary(text)
+file = open("vocabulary.txt", 'r')
+vocabulary = file.read()
+file.close()
+vocabulary = vocabulary.split()
+vocabulary = set(vocabulary)
+process_docs(text, vocabulary)
 tokenizer = Tokenizer()
 
 # fit the tokenizer on the documents
@@ -140,5 +173,13 @@ docs = positive_lines + negative_lines
 tokenizer.fit_on_texts(docs)
 Xtrain = tokenizer.texts_to_matrix(docs, mode='freq')
 print(Xtrain.shape)
+positive_lines.clear()
+negative_lines.clear()
+process_test_data(text, vocabulary)
+docs = negative_lines + positive_lines
+Xtest = tokenizer.texts_to_matrix(docs, mode = 'freq')
+print(Xtest.shape)
+ytrain = array([0 for _ in range(3000)] + [1 for _ in range (3000)])
+ytest = array([0 for _ in range(1000)] + [1 for _ in range (1000)])
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
