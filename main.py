@@ -1,5 +1,8 @@
 import re
 #import tenserflow
+import keras
+from keras import models
+from keras import layers
 from keras.preprocessing.text import Tokenizer
 import nltk
 import pandas as pd
@@ -181,5 +184,13 @@ Xtest = tokenizer.texts_to_matrix(docs, mode = 'freq')
 print(Xtest.shape)
 ytrain = array([0 for _ in range(3000)] + [1 for _ in range (3000)])
 ytest = array([0 for _ in range(1000)] + [1 for _ in range (1000)])
-
+features = Xtest.shape[1]
+network = models.Sequential()
+network.add(layers.Dense(units = 5, activation = 'relu', input_shape = (features,)))
+network.add(layers.Dense(units = 5, activation = 'relu'))
+network.add(layers.Dense(units = 1, activation = 'sigmoid'))
+network.compile(loss = 'binary_crossentropy', optimizer='adam', metrics = ['accuracy'])
+network.fit(Xtrain,ytrain, epochs=50, verbose = 2)
+loss, acc = network.evaluate(Xtest, ytest, verbose = 0)
+print('Test accuracy: %f' %(acc*100) )
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
