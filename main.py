@@ -1,5 +1,5 @@
 import re
-#import tenserflow
+import tensorflow
 import keras
 from keras import models
 from keras import layers
@@ -172,25 +172,23 @@ process_docs(text, vocabulary)
 tokenizer = Tokenizer()
 
 # fit the tokenizer on the documents
-docs = positive_lines + negative_lines
+docs = negative_lines + positive_lines
 tokenizer.fit_on_texts(docs)
 Xtrain = tokenizer.texts_to_matrix(docs, mode='freq')
-print(Xtrain.shape)
+ytrain = array([0 for _ in range(3000)] + [1 for _ in range(3000)])
 positive_lines.clear()
 negative_lines.clear()
 process_test_data(text, vocabulary)
 docs = negative_lines + positive_lines
-Xtest = tokenizer.texts_to_matrix(docs, mode = 'freq')
-print(Xtest.shape)
-ytrain = array([0 for _ in range(3000)] + [1 for _ in range (3000)])
-ytest = array([0 for _ in range(1000)] + [1 for _ in range (1000)])
+Xtest = tokenizer.texts_to_matrix(docs, mode='freq')
+ytest = array([0 for _ in range(1000)] + [1 for _ in range(1000)])
 features = Xtest.shape[1]
 network = models.Sequential()
-network.add(layers.Dense(units = 5, activation = 'relu', input_shape = (features,)))
-network.add(layers.Dense(units = 5, activation = 'relu'))
-network.add(layers.Dense(units = 1, activation = 'sigmoid'))
-network.compile(loss = 'binary_crossentropy', optimizer='adam', metrics = ['accuracy'])
-network.fit(Xtrain,ytrain, epochs=50, verbose = 2)
-loss, acc = network.evaluate(Xtest, ytest, verbose = 0)
-print('Test accuracy: %f' %(acc*100) )
+network.add(layers.Dense(units=50, activation='relu', input_shape=(features,)))
+#network.add(layers.Dense(units = 250, activation = 'relu'))
+network.add(layers.Dense(units = 1, activation='sigmoid'))
+network.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+network.fit(Xtrain, ytrain, epochs=50, verbose=2)
+loss, acc = network.evaluate(Xtest, ytest, verbose=0)
+print('Test accuracy: %f' % (acc*100))
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
