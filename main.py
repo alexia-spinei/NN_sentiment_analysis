@@ -2,7 +2,7 @@ import re
 import string
 import tensorflow
 import nltk
-from sklearn.model_selection import RepeatedKFold, cross_val_score, StratifiedKFold
+from sklearn.model_selection import RepeatedKFold, cross_val_score, StratifiedKFold, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 
 import pandas as pd
@@ -175,6 +175,11 @@ vocabulary = vocabulary.split()
 vocabulary = set(vocabulary)
 process_docs(text, vocabulary)
 tokenizer = Tokenizer()
+grid_param = {
+    'n_estimators': [100, 300, 500, 800, 1000],
+    'criterion': ['gini', 'entropy'],
+    'bootstrap': [True, False]
+}
 
 # fit the tokenizer on the documents
 docs = negative_lines + positive_lines
@@ -196,6 +201,18 @@ network.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy
 classifier = RandomForestClassifier(n_estimators=300, random_state=0)
 all_accuracies = cross_val_score(estimator=classifier, X=Xtrain, y=ytrain, cv=5)
 print(all_accuracies)
+print(all_accuracies.std())
+gd_sr = GridSearchCV(estimator=classifier,
+                     param_grid=grid_param,
+                     scoring='accuracy',
+                     cv=5,
+                     n_jobs=-1)
+
+gd_sr.fit(Xtrain, ytrain)
+best_parameters = gd_sr.best_params_
+print(best_parameters)
+best_result = gd_sr.best_score_
+print(best_result)
 network.fit(Xtrain, ytrain, epochs=50, verbose=2)
 loss, acc = network.evaluate(Xtest, ytest, verbose=0)
 print('Test accuracy: %f' % (acc * 100))
