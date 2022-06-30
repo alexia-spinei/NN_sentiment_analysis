@@ -1,34 +1,35 @@
 import re
+import string
 import tensorflow
-import keras
-from keras import models
-from keras import layers
-from keras.preprocessing.text import Tokenizer
 import nltk
+from sklearn.model_selection import RepeatedKFold, cross_val_score, StratifiedKFold
+from sklearn.ensemble import RandomForestClassifier
+
 import pandas as pd
+from keras import layers
+from keras import models
+from keras.preprocessing.text import Tokenizer
 from nltk import WordNetLemmatizer
 from nltk.corpus import stopwords
 from nltk.corpus import wordnet
-import json
-import string
-import pandas as pd
 from numpy import array
-from tqdm import tqdm
-from nltk.collocations import TrigramCollocationFinder, TrigramAssocMeasures
 from unidecode import unidecode
+import keras.backend as K
 
 nlp = WordNetLemmatizer()
 positive_lines = list()
 negative_lines = list()
 
 
-def count_loss_function(y_actual, y_predicted):
-	if y_actual == y_predicted:
-		loss_value = 0
-	else:
-		loss_value = 1
-	return loss_value
-
+def count_loss_function(y_true, y_pred):
+    casted = K.cast(y_pred, "int32")
+    loss = 1.0
+    #casted = tensorflow.cast(y_pred, tensorflow.int32)
+    if K.equal(y_true, casted):
+        loss = 0.0
+    else:
+        loss = 1.0
+    return K.cast(loss, "float32")
 
 
 def get_wordnet_pos(word):
@@ -43,126 +44,130 @@ def get_wordnet_pos(word):
 
 
 def lemmatization(file):
-	tokenized = nltk.word_tokenize(file)
-	words = []
-	for t in file:
-		words.append(nlp.lemmatize(t))
-	return " ".join(words)
+    tokenized = nltk.word_tokenize(file)
+    words = []
+    for t in file:
+        words.append(nlp.lemmatize(t))
+    return " ".join(words)
+
 
 # code taken from https://medium.com/analytics-vidhya/data-preparation-and-text-preprocessing-on-amazon-fine-food-reviews-7b7a2665c3f4
 
 
 def decontracted(phrase):
-	phrase = re.sub(r"won't", "will not", phrase)
-	phrase = re.sub(r"can't", "can not", phrase)
-	phrase = re.sub(r"n\'t", " not", phrase)
-	phrase = re.sub(r"\'re", " are", phrase)
-	phrase = re.sub(r"\'s", " is", phrase)
-	phrase = re.sub(r"\'d", " would", phrase)
-	phrase = re.sub(r"\'ll", " will", phrase)
-	phrase = re.sub(r"\'t", " not", phrase)
-	phrase = re.sub(r"\'ve", " have", phrase)
-	phrase = re.sub(r"\'m", " am", phrase)
-	phrase = re.sub(r"<br />", " ", phrase)  # added to get rid of the line breaks
+    phrase = re.sub(r"won't", "will not", phrase)
+    phrase = re.sub(r"can't", "can not", phrase)
+    phrase = re.sub(r"n\'t", " not", phrase)
+    phrase = re.sub(r"\'re", " are", phrase)
+    phrase = re.sub(r"\'s", " is", phrase)
+    phrase = re.sub(r"\'d", " would", phrase)
+    phrase = re.sub(r"\'ll", " will", phrase)
+    phrase = re.sub(r"\'t", " not", phrase)
+    phrase = re.sub(r"\'ve", " have", phrase)
+    phrase = re.sub(r"\'m", " am", phrase)
+    phrase = re.sub(r"<br />", " ", phrase)  # added to get rid of the line breaks
 
-	return phrase
+    return phrase
+
 
 # source: https://machinelearningmastery.com/deep-learning-bag-of-words-model-sentiment-analysis/
 def clean_doc(doc):
-	# remove abbreviations and line breaks
-	doc = unidecode(doc.lower())
-	doc = decontracted(doc)
-	# remove punctuation from each token
-	for char in string.punctuation:
-		doc = doc.replace(char, ' ')
-	# split into tokens by white space
-	tokens = doc.split()
-	# remove remaining tokens that are not alphabetic
-	tokens = [word for word in tokens if word.isalpha()]
-	# filter out stop words
-	stop_words = set(stopwords.words('english'))
-	tokens = [word for word in tokens if not word in stop_words]
-	# filter out short tokens
-	tokens = [word for word in tokens if len(word) > 1]
+    # remove abbreviations and line breaks
+    doc = unidecode(doc.lower())
+    doc = decontracted(doc)
+    # remove punctuation from each token
+    for char in string.punctuation:
+        doc = doc.replace(char, ' ')
+    # split into tokens by white space
+    tokens = doc.split()
+    # remove remaining tokens that are not alphabetic
+    tokens = [word for word in tokens if word.isalpha()]
+    # filter out stop words
+    stop_words = set(stopwords.words('english'))
+    tokens = [word for word in tokens if not word in stop_words]
+    # filter out short tokens
+    tokens = [word for word in tokens if len(word) > 1]
 
-	return tokens
+    return tokens
 
 
 def dictionary(file, dic):
-	for word in file:
-		if word not in dic:
-			dic[word] = 1
-		else:
-			dic[word] = dic[word]+1
+    for word in file:
+        if word not in dic:
+            dic[word] = 1
+        else:
+            dic[word] = dic[word] + 1
 
 
-def writeToFile(dictionary,name):
-	dic = dict(sorted(dictionary.items(), reverse=True, key = lambda x: x[1]))
-	for key in list(dic.keys()):
-		with open(name+".txt", "a") as f:
-			print(key, '\t', file = f)
-	f.close()
+def writeToFile(dictionary, name):
+    dic = dict(sorted(dictionary.items(), reverse=True, key=lambda x: x[1]))
+    for key in list(dic.keys()):
+        with open(name + ".txt", "a") as f:
+            print(key, '\t', file=f)
+    f.close()
+
 
 def buildVocabulary(text):
-	dic = dict()
-	for i in range(0, 3000):
-		file = text["review"][i]
-		tokens = clean_doc(file)
-		lemmas = []
-		for w in tokens:
-			w = nlp.lemmatize(w, get_wordnet_pos(w))
-			lemmas.append(w)
-		dictionary(lemmas, dic)
-	for i in range(25002, 28002):
-		file = text["review"][i]
-		tokens = clean_doc(file)
-		lemmas = []
-		for w in tokens:
-			w = nlp.lemmatize(w, get_wordnet_pos(w))
-			lemmas.append(w)
-		dictionary(lemmas, dic)
-	# remove word with low occurrence
-	min_frequency = 2
-	final_dic = dict()
-	for word in dic:
-		if dic[word] >= min_frequency:
-			final_dic[word] = dic[word]
-	writeToFile(final_dic, "vocabulary")
+    dic = dict()
+    for i in range(0, 3000):
+        file = text["review"][i]
+        tokens = clean_doc(file)
+        lemmas = []
+        for w in tokens:
+            w = nlp.lemmatize(w, get_wordnet_pos(w))
+            lemmas.append(w)
+        dictionary(lemmas, dic)
+    for i in range(25002, 28002):
+        file = text["review"][i]
+        tokens = clean_doc(file)
+        lemmas = []
+        for w in tokens:
+            w = nlp.lemmatize(w, get_wordnet_pos(w))
+            lemmas.append(w)
+        dictionary(lemmas, dic)
+    # remove word with low occurrence
+    min_frequency = 2
+    final_dic = dict()
+    for word in dic:
+        if dic[word] >= min_frequency:
+            final_dic[word] = dic[word]
+    writeToFile(final_dic, "vocabulary")
+
 
 def process_docs(text, vocab):
-	for i in range(0,3000):
-		file = text["review"][i]
-		tokens = clean_doc(file)
-		tokens = [w for w in tokens if w in vocab]
-		line = ' '.join(tokens)
-		negative_lines.append(line)
-	for i in range(25002, 28002):
-		file = text["review"][i]
-		tokens = clean_doc(file)
-		tokens = [w for w in tokens if w in vocab]
-		line = ' '.join(tokens)
-		positive_lines.append(line)
+    for i in range(0, 3000):
+        file = text["review"][i]
+        tokens = clean_doc(file)
+        tokens = [w for w in tokens if w in vocab]
+        line = ' '.join(tokens)
+        negative_lines.append(line)
+    for i in range(25002, 28002):
+        file = text["review"][i]
+        tokens = clean_doc(file)
+        tokens = [w for w in tokens if w in vocab]
+        line = ' '.join(tokens)
+        positive_lines.append(line)
 
 
 def process_test_data(text, vocab):
-	for i in range(3001, 4001):
-		file = text["review"][i]
-		tokens = clean_doc(file)
-		tokens = [w for w in tokens if w in vocab]
-		line = ' '.join(tokens)
-		negative_lines.append(line)
-	for i in range(28003, 29003):
-		file = text["review"][i]
-		tokens = clean_doc(file)
-		tokens = [w for w in tokens if w in vocab]
-		line = ' '.join(tokens)
-		positive_lines.append(line)
+    for i in range(3001, 4001):
+        file = text["review"][i]
+        tokens = clean_doc(file)
+        tokens = [w for w in tokens if w in vocab]
+        line = ' '.join(tokens)
+        negative_lines.append(line)
+    for i in range(28003, 29003):
+        file = text["review"][i]
+        tokens = clean_doc(file)
+        tokens = [w for w in tokens if w in vocab]
+        line = ' '.join(tokens)
+        positive_lines.append(line)
 
 
 # load the document
 col_list = ["review", "sentiment"]
 text = pd.read_csv("IMDB Dataset.csv", usecols=col_list)
-#buildVocabulary(text)
+# buildVocabulary(text)
 file = open("vocabulary.txt", 'r')
 vocabulary = file.read()
 file.close()
@@ -185,10 +190,13 @@ ytest = array([0 for _ in range(1000)] + [1 for _ in range(1000)])
 features = Xtest.shape[1]
 network = models.Sequential()
 network.add(layers.Dense(units=50, activation='relu', input_shape=(features,)))
-#network.add(layers.Dense(units = 250, activation = 'relu'))
-network.add(layers.Dense(units = 1, activation='sigmoid'))
+network.add(layers.Dense(units=50, activation='relu'))
+network.add(layers.Dense(units=1, activation='sigmoid'))
 network.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+classifier = RandomForestClassifier(n_estimators=300, random_state=0)
+all_accuracies = cross_val_score(estimator=classifier, X=Xtrain, y=ytrain, cv=5)
+print(all_accuracies)
 network.fit(Xtrain, ytrain, epochs=50, verbose=2)
 loss, acc = network.evaluate(Xtest, ytest, verbose=0)
-print('Test accuracy: %f' % (acc*100))
+print('Test accuracy: %f' % (acc * 100))
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
