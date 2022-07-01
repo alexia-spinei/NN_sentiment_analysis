@@ -2,9 +2,11 @@ import re
 import string
 import tensorflow
 import nltk
-from sklearn.model_selection import RepeatedKFold, cross_val_score, StratifiedKFold, GridSearchCV
+from sklearn.model_selection import RepeatedKFold, cross_val_score, StratifiedKFold, GridSearchCV, KFold
 from sklearn.ensemble import RandomForestClassifier
-
+# from tensorflow.keras.models import save_model
+from keras import saving
+import numpy as np
 import pandas as pd
 from keras import layers
 from keras import models
@@ -13,18 +15,21 @@ from nltk import WordNetLemmatizer
 from nltk.corpus import stopwords
 from nltk.corpus import wordnet
 from numpy import array
+from tensorflow.python.keras.saving.save import load_model
 from unidecode import unidecode
 import keras.backend as K
 
 nlp = WordNetLemmatizer()
 positive_lines = list()
 negative_lines = list()
+acc_per_fold = []
+loss_per_fold = []
 
 
 def count_loss_function(y_true, y_pred):
     casted = K.cast(y_pred, "int32")
     loss = 1.0
-    #casted = tensorflow.cast(y_pred, tensorflow.int32)
+    # casted = tensorflow.cast(y_pred, tensorflow.int32)
     if K.equal(y_true, casted):
         loss = 0.0
     else:
@@ -176,7 +181,7 @@ vocabulary = set(vocabulary)
 process_docs(text, vocabulary)
 tokenizer = Tokenizer()
 grid_param = {
-    'n_estimators': [100, 300, 500, 800, 1000],
+    'n_estimators': [70, 150, 200],
     'criterion': ['gini', 'entropy'],
     'bootstrap': [True, False]
 }
@@ -191,29 +196,53 @@ negative_lines.clear()
 process_test_data(text, vocabulary)
 docs = negative_lines + positive_lines
 Xtest = tokenizer.texts_to_matrix(docs, mode='freq')
+print(Xtrain.shape)
 ytest = array([0 for _ in range(1000)] + [1 for _ in range(1000)])
 features = Xtest.shape[1]
-network = models.Sequential()
-network.add(layers.Dense(units=50, activation='relu', input_shape=(features,)))
-network.add(layers.Dense(units=50, activation='relu'))
-network.add(layers.Dense(units=1, activation='sigmoid'))
-network.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-classifier = RandomForestClassifier(n_estimators=300, random_state=0)
-all_accuracies = cross_val_score(estimator=classifier, X=Xtrain, y=ytrain, cv=5)
-print(all_accuracies)
-print(all_accuracies.std())
-gd_sr = GridSearchCV(estimator=classifier,
-                     param_grid=grid_param,
-                     scoring='accuracy',
-                     cv=5,
-                     n_jobs=-1)
-
-gd_sr.fit(Xtrain, ytrain)
-best_parameters = gd_sr.best_params_
-print(best_parameters)
-best_result = gd_sr.best_score_
-print(best_result)
-network.fit(Xtrain, ytrain, epochs=50, verbose=2)
-loss, acc = network.evaluate(Xtest, ytest, verbose=0)
-print('Test accuracy: %f' % (acc * 100))
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+kfold = KFold(n_splits=5, shuffle=True)
+fold_no = 1
+# for train, test in kfold.split(Xtrain, ytrain):
+#     # Define the model architecture
+#     network = models.Sequential()
+#     network.add(layers.Dense(units=50, activation='relu', input_shape=(features,)))
+#     network.add(layers.Dense(units=50, activation='relu'))
+#     network.add(layers.Dense(units=1, activation='sigmoid'))
+#
+#     # Compile the model
+#     network.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+#
+#     # Generate a print
+#     print('------------------------------------------------------------------------')
+#     print(f'Training for fold {fold_no} ...')
+#
+#     # Fit data to model
+#     history = network.fit(Xtrain[train], ytrain[train],
+#                           epochs=50,
+#                           verbose=2)
+#
+#     # Generate generalization metrics
+#     scores = network.evaluate(Xtrain[test], ytrain[test], verbose=0)
+#     print(
+#         f'Score for fold {fold_no}: {network.metrics_names[0]} of {scores[0]}; {network.metrics_names[1]} of {scores[1] * 100}%')
+#     acc_per_fold.append(scores[1] * 100)
+#     loss_per_fold.append(scores[0])
+#     filepath = './saved_model/' + str(fold_no)
+#     network.save(filepath = filepath)
+#     # Increase fold number
+#     fold_no = fold_no + 1
+#
+# # == Provide average scores ==
+# print('------------------------------------------------------------------------')
+# print('Score per fold')
+# for i in range(0, len(acc_per_fold)):
+#     print('------------------------------------------------------------------------')
+#     print(f'> Fold {i + 1} - Loss: {loss_per_fold[i]} - Accuracy: {acc_per_fold[i]}%')
+# print('------------------------------------------------------------------------')
+# print('Average scores for all folds:')
+# print(f'> Accuracy: {np.mean(acc_per_fold)} (+- {np.std(acc_per_fold)})')
+# print(f'> Loss: {np.mean(loss_per_fold)}')
+# print('------------------------------------------------------------------------')
+# print(all_accuracies.std())
+loaded_network = load_model('saved_model/4')
+loss, acc = loaded_network.evaluate(Xtest, ytest, verbose=0)
+print('accuracy: %f' % (acc * 100))
