@@ -1,11 +1,6 @@
 import re
 import string
-import tensorflow
 import nltk
-from sklearn.model_selection import RepeatedKFold, cross_val_score, StratifiedKFold, GridSearchCV, KFold
-from sklearn.ensemble import RandomForestClassifier
-# from tensorflow.keras.models import save_model
-from keras import saving
 import numpy as np
 import pandas as pd
 from keras import layers
@@ -15,26 +10,15 @@ from nltk import WordNetLemmatizer
 from nltk.corpus import stopwords
 from nltk.corpus import wordnet
 from numpy import array
+from sklearn.model_selection import KFold
 from tensorflow.python.keras.saving.save import load_model
 from unidecode import unidecode
-import keras.backend as K
 
 nlp = WordNetLemmatizer()
 positive_lines = list()
 negative_lines = list()
 acc_per_fold = []
 loss_per_fold = []
-
-
-def count_loss_function(y_true, y_pred):
-    casted = K.cast(y_pred, "int32")
-    loss = 1.0
-    # casted = tensorflow.cast(y_pred, tensorflow.int32)
-    if K.equal(y_true, casted):
-        loss = 0.0
-    else:
-        loss = 1.0
-    return K.cast(loss, "float32")
 
 
 def get_wordnet_pos(word):
@@ -56,7 +40,8 @@ def lemmatization(file):
     return " ".join(words)
 
 
-# code taken from https://medium.com/analytics-vidhya/data-preparation-and-text-preprocessing-on-amazon-fine-food-reviews-7b7a2665c3f4
+# code taken from https://medium.com/analytics-vidhya/data-preparation-and-text-preprocessing-on-amazon-fine-food
+# -reviews-7b7a2665c3f4
 
 
 def decontracted(phrase):
@@ -104,7 +89,7 @@ def dictionary(file, dic):
             dic[word] = dic[word] + 1
 
 
-def writeToFile(dictionary, name):
+def write_to_file(dictionary, name):
     dic = dict(sorted(dictionary.items(), reverse=True, key=lambda x: x[1]))
     for key in list(dic.keys()):
         with open(name + ".txt", "a") as f:
@@ -112,7 +97,7 @@ def writeToFile(dictionary, name):
     f.close()
 
 
-def buildVocabulary(text):
+def build_vocabulary(text):
     dic = dict()
     for i in range(0, 3000):
         file = text["review"][i]
@@ -136,7 +121,7 @@ def buildVocabulary(text):
     for word in dic:
         if dic[word] >= min_frequency:
             final_dic[word] = dic[word]
-    writeToFile(final_dic, "vocabulary")
+    write_to_file(final_dic, "vocabulary")
 
 
 def process_docs(text, vocab):
@@ -156,93 +141,89 @@ def process_docs(text, vocab):
 
 def process_test_data(text, vocab):
     for i in range(3001, 4001):
-        file = text["review"][i]
-        tokens = clean_doc(file)
+        textfile = text["review"][i]
+        tokens = clean_doc(textfile)
         tokens = [w for w in tokens if w in vocab]
         line = ' '.join(tokens)
         negative_lines.append(line)
     for i in range(28003, 29003):
-        file = text["review"][i]
-        tokens = clean_doc(file)
+        textfile = text["review"][i]
+        tokens = clean_doc(textfile)
         tokens = [w for w in tokens if w in vocab]
         line = ' '.join(tokens)
         positive_lines.append(line)
 
 
-# load the document
-col_list = ["review", "sentiment"]
-text = pd.read_csv("IMDB Dataset.csv", usecols=col_list)
-# buildVocabulary(text)
-file = open("vocabulary.txt", 'r')
-vocabulary = file.read()
-file.close()
-vocabulary = vocabulary.split()
-vocabulary = set(vocabulary)
-process_docs(text, vocabulary)
-tokenizer = Tokenizer()
-grid_param = {
-    'n_estimators': [70, 150, 200],
-    'criterion': ['gini', 'entropy'],
-    'bootstrap': [True, False]
-}
+def k_fold_cross_validation(inputs, targets):
+    fold_no = 1
+    k_fold = KFold(n_splits=5, shuffle=True)
+    for train, test in k_fold.split(inputs, targets):
+        # Define the model architecture
+        network = models.Sequential()
+        network.add(layers.Dense(units=50, activation='relu', input_shape=(features,)))
+        network.add(layers.Dense(units=50, activation='relu'))
+        network.add(layers.Dense(units=1, activation='sigmoid'))
+        # Compile the model
+        network.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+        # Generate a print
+        print('------------------------------------------------------------------------')
+        print(f'Training for fold {fold_no} ...')
+        # Fit data to model
+        history = network.fit(inputs[train], targets[train],
+                              epochs=50,
+                              verbose=2)
+        # Generate generalization metrics
+        scores = network.evaluate(inputs[test], targets[test], verbose=0)
+        print(
+            f'Score for fold {fold_no}: {network.metrics_names[0]} of {scores[0]}; {network.metrics_names[1]} of '
+            f'{scores[1] * 100}%')
+        acc_per_fold.append(scores[1] * 100)
+        loss_per_fold.append(scores[0])
+        filepath = './saved_model/' + str(fold_no)
+        network.save(filepath=filepath)
+        # Increase fold number
+        fold_no = fold_no + 1
 
-# fit the tokenizer on the documents
-docs = negative_lines + positive_lines
-tokenizer.fit_on_texts(docs)
-Xtrain = tokenizer.texts_to_matrix(docs, mode='freq')
-ytrain = array([0 for _ in range(3000)] + [1 for _ in range(3000)])
-positive_lines.clear()
-negative_lines.clear()
-process_test_data(text, vocabulary)
-docs = negative_lines + positive_lines
-Xtest = tokenizer.texts_to_matrix(docs, mode='freq')
-print(Xtrain.shape)
-ytest = array([0 for _ in range(1000)] + [1 for _ in range(1000)])
-features = Xtest.shape[1]
-kfold = KFold(n_splits=5, shuffle=True)
-fold_no = 1
-# for train, test in kfold.split(Xtrain, ytrain):
-#     # Define the model architecture
-#     network = models.Sequential()
-#     network.add(layers.Dense(units=50, activation='relu', input_shape=(features,)))
-#     network.add(layers.Dense(units=50, activation='relu'))
-#     network.add(layers.Dense(units=1, activation='sigmoid'))
-#
-#     # Compile the model
-#     network.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-#
-#     # Generate a print
-#     print('------------------------------------------------------------------------')
-#     print(f'Training for fold {fold_no} ...')
-#
-#     # Fit data to model
-#     history = network.fit(Xtrain[train], ytrain[train],
-#                           epochs=50,
-#                           verbose=2)
-#
-#     # Generate generalization metrics
-#     scores = network.evaluate(Xtrain[test], ytrain[test], verbose=0)
-#     print(
-#         f'Score for fold {fold_no}: {network.metrics_names[0]} of {scores[0]}; {network.metrics_names[1]} of {scores[1] * 100}%')
-#     acc_per_fold.append(scores[1] * 100)
-#     loss_per_fold.append(scores[0])
-#     filepath = './saved_model/' + str(fold_no)
-#     network.save(filepath = filepath)
-#     # Increase fold number
-#     fold_no = fold_no + 1
-#
-# # == Provide average scores ==
-# print('------------------------------------------------------------------------')
-# print('Score per fold')
-# for i in range(0, len(acc_per_fold)):
-#     print('------------------------------------------------------------------------')
-#     print(f'> Fold {i + 1} - Loss: {loss_per_fold[i]} - Accuracy: {acc_per_fold[i]}%')
-# print('------------------------------------------------------------------------')
-# print('Average scores for all folds:')
-# print(f'> Accuracy: {np.mean(acc_per_fold)} (+- {np.std(acc_per_fold)})')
-# print(f'> Loss: {np.mean(loss_per_fold)}')
-# print('------------------------------------------------------------------------')
-# print(all_accuracies.std())
-loaded_network = load_model('saved_model/4')
-loss, acc = loaded_network.evaluate(Xtest, ytest, verbose=0)
-print('accuracy: %f' % (acc * 100))
+    # == Provide average scores ==
+    print('------------------------------------------------------------------------')
+    print('Score per fold')
+    for i in range(0, len(acc_per_fold)):
+        print('------------------------------------------------------------------------')
+        print(f'> Fold {i + 1} - Loss: {loss_per_fold[i]} - Accuracy: {acc_per_fold[i]}%')
+    print('------------------------------------------------------------------------')
+    print('Average scores for all folds:')
+    print(f'> Accuracy: {np.mean(acc_per_fold)} (+- {np.std(acc_per_fold)})')
+    print(f'> Loss: {np.mean(loss_per_fold)}')
+    print('------------------------------------------------------------------------')
+
+
+if __name__ == '__main__':
+    # load the document
+    col_list = ["review", "sentiment"]
+    text = pd.read_csv("IMDB Dataset.csv", usecols=col_list)
+    # build_vocabulary(text)
+    file = open("vocabulary.txt", 'r')
+    vocabulary = file.read()
+    file.close()
+    vocabulary = vocabulary.split()
+    vocabulary = set(vocabulary)
+    process_docs(text, vocabulary)
+    tokenizer = Tokenizer()
+    # fit the tokenizer on the documents
+    docs = negative_lines + positive_lines
+    tokenizer.fit_on_texts(docs)
+    x_train = tokenizer.texts_to_matrix(docs, mode='freq')
+    y_train = array([0 for _ in range(3000)] + [1 for _ in range(3000)])
+    positive_lines.clear()
+    negative_lines.clear()
+    process_test_data(text, vocabulary)
+    docs = negative_lines + positive_lines
+    x_test = tokenizer.texts_to_matrix(docs, mode='freq')
+    print(x_train.shape)
+    y_test = array([0 for _ in range(1000)] + [1 for _ in range(1000)])
+    features = x_test.shape[1]
+    k_fold_cross_validation(x_train, y_train)
+    loaded_network = load_model('saved_model/4')
+    loaded_network.summary()
+    loss, acc = loaded_network.evaluate(x_test, y_test, verbose=0)
+    print('accuracy: %f' % (acc * 100))
