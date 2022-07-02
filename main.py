@@ -13,6 +13,8 @@ from numpy import array
 from sklearn.model_selection import KFold
 from tensorflow.python.keras.saving.save import load_model
 from unidecode import unidecode
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
 
 nlp = WordNetLemmatizer()
 positive_lines = list()
@@ -33,7 +35,6 @@ def get_wordnet_pos(word):
 
 
 def lemmatization(file):
-    tokenized = nltk.word_tokenize(file)
     words = []
     for t in file:
         words.append(nlp.lemmatize(t))
@@ -44,6 +45,7 @@ def lemmatization(file):
 # -reviews-7b7a2665c3f4
 
 
+# this function is meant to get rid of any abbreviations
 def decontracted(phrase):
     phrase = re.sub(r"won't", "will not", phrase)
     phrase = re.sub(r"can't", "can not", phrase)
@@ -58,6 +60,15 @@ def decontracted(phrase):
     phrase = re.sub(r"<br />", " ", phrase)  # added to get rid of the line breaks
 
     return phrase
+
+
+def word_cloud(reviews):
+    plt.figure(figsize=(10, 10))
+    sentiment_text = ' '.join(reviews)
+    WC = WordCloud(width=1000, height=500, max_words=500, min_font_size=5)
+    sentiment_words = WC.generate(sentiment_text)
+    plt.imshow(sentiment_words, interpolation='bilinear')
+    plt.show()
 
 
 # source: https://machinelearningmastery.com/deep-learning-bag-of-words-model-sentiment-analysis/
@@ -77,10 +88,10 @@ def clean_doc(doc):
     tokens = [word for word in tokens if not word in stop_words]
     # filter out short tokens
     tokens = [word for word in tokens if len(word) > 1]
-
     return tokens
 
 
+# we construct our dictionary using this function
 def dictionary(file, dic):
     for word in file:
         if word not in dic:
@@ -89,6 +100,7 @@ def dictionary(file, dic):
             dic[word] = dic[word] + 1
 
 
+# we use this function to store the dictionary as our vocabulary
 def write_to_file(dictionary, name):
     dic = dict(sorted(dictionary.items(), reverse=True, key=lambda x: x[1]))
     for key in list(dic.keys()):
@@ -97,8 +109,11 @@ def write_to_file(dictionary, name):
     f.close()
 
 
+# this function is used to build the vocabulary
 def build_vocabulary(text):
     dic = dict()
+    # for our training set we chose our data deterministically;
+    # we take the first 3000 positive reviews and the first 3000 negative reviews in order to build our set
     for i in range(0, 3000):
         file = text["review"][i]
         tokens = clean_doc(file)
@@ -115,22 +130,29 @@ def build_vocabulary(text):
             w = nlp.lemmatize(w, get_wordnet_pos(w))
             lemmas.append(w)
         dictionary(lemmas, dic)
-    # remove word with low occurrence
+    # remove word with low occurrence to restrain our vocabulary
     min_frequency = 2
     final_dic = dict()
     for word in dic:
         if dic[word] >= min_frequency:
             final_dic[word] = dic[word]
+    # we then store our vocabulary to use it later for training the network
     write_to_file(final_dic, "vocabulary")
 
 
-def process_docs(text, vocab):
+# this function is used to deterministically build our input vector for training
+# similar to the way we build our vocabulary
+def process_train_data(text, vocab):
     for i in range(0, 3000):
         file = text["review"][i]
+        # each review is pre-processed
         tokens = clean_doc(file)
+        # then we only keep the words from our vocabulary
         tokens = [w for w in tokens if w in vocab]
+        # and join them as a review again
         line = ' '.join(tokens)
         negative_lines.append(line)
+    # the same process is done for the positive reviews
     for i in range(25002, 28002):
         file = text["review"][i]
         tokens = clean_doc(file)
@@ -139,6 +161,8 @@ def process_docs(text, vocab):
         positive_lines.append(line)
 
 
+# this function is similar to the function used to process the training data
+# the process is identical, now we just take the next 1000 positive reviews + the next 1000 negative reviews
 def process_test_data(text, vocab):
     for i in range(3001, 4001):
         textfile = text["review"][i]
@@ -154,6 +178,7 @@ def process_test_data(text, vocab):
         positive_lines.append(line)
 
 
+# function used to do a five-fold cross validation
 def k_fold_cross_validation(inputs, targets):
     fold_no = 1
     k_fold = KFold(n_splits=5, shuffle=True)
@@ -183,7 +208,6 @@ def k_fold_cross_validation(inputs, targets):
         network.save(filepath=filepath)
         # Increase fold number
         fold_no = fold_no + 1
-
     # == Provide average scores ==
     print('------------------------------------------------------------------------')
     print('Score per fold')
@@ -203,27 +227,36 @@ if __name__ == '__main__':
     text = pd.read_csv("IMDB Dataset.csv", usecols=col_list)
     # build_vocabulary(text)
     file = open("vocabulary.txt", 'r')
+    # load the results
     vocabulary = file.read()
     file.close()
     vocabulary = vocabulary.split()
     vocabulary = set(vocabulary)
-    process_docs(text, vocabulary)
+    process_train_data(text, vocabulary)
     tokenizer = Tokenizer()
     # fit the tokenizer on the documents
     docs = negative_lines + positive_lines
     tokenizer.fit_on_texts(docs)
+    # create the input vectors and output vectors for training
     x_train = tokenizer.texts_to_matrix(docs, mode='freq')
     y_train = array([0 for _ in range(3000)] + [1 for _ in range(3000)])
+    # word_cloud(positive_lines)
+    # word_cloud(negative_lines)
+    # we clear the lists of positive/negative reviews in order to now load the test data
     positive_lines.clear()
     negative_lines.clear()
+    # load the test data
     process_test_data(text, vocabulary)
     docs = negative_lines + positive_lines
+    # create the input vectors and output vectors for training
     x_test = tokenizer.texts_to_matrix(docs, mode='freq')
-    print(x_train.shape)
     y_test = array([0 for _ in range(1000)] + [1 for _ in range(1000)])
     features = x_test.shape[1]
-    k_fold_cross_validation(x_train, y_train)
+    # perform the k-fold cross-validation
+    # k_fold_cross_validation(x_train, y_train)
+    # load the best model
     loaded_network = load_model('saved_model/4')
     loaded_network.summary()
+    # test it using the test data.
     loss, acc = loaded_network.evaluate(x_test, y_test, verbose=0)
     print('accuracy: %f' % (acc * 100))
