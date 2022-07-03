@@ -3,8 +3,10 @@ import string
 import nltk
 import numpy as np
 import pandas as pd
+import keras_tuner
 from keras import layers
 from keras import models
+from keras import optimizers
 from keras.preprocessing.text import Tokenizer
 from nltk import WordNetLemmatizer
 from nltk.corpus import stopwords
@@ -32,6 +34,16 @@ def get_wordnet_pos(word):
                 "R": wordnet.ADV}
 
     return tag_dict.get(tag, wordnet.NOUN)
+
+
+def plotgraph(history, string):
+    plt.plot(history.history[string], label='training ' + string)
+    plt.plot(history.history['val_' + string], label='validation ' + string)
+    plt.legend()
+    plt.xlabel('epochs')
+    plt.ylabel(string)
+    plt.title(string + ' vs epochs')
+    plt.show()
 
 
 def lemmatization(file):
@@ -185,11 +197,11 @@ def k_fold_cross_validation(inputs, targets):
     for train, test in k_fold.split(inputs, targets):
         # Define the model architecture
         network = models.Sequential()
-        network.add(layers.Dense(units=50, activation='relu', input_shape=(features,)))
-        network.add(layers.Dense(units=50, activation='relu'))
+        network.add(layers.Dense(units=160, activation='relu', input_shape=(features,)))
+        network.add(layers.Dense(units=192, activation='relu'))
         network.add(layers.Dense(units=1, activation='sigmoid'))
         # Compile the model
-        network.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+        network.compile(loss='binary_crossentropy', optimizer=optimizers.Nadam(learning_rate=0.00016116), metrics=['accuracy'])
         # Generate a print
         print('------------------------------------------------------------------------')
         print(f'Training for fold {fold_no} ...')
@@ -221,6 +233,39 @@ def k_fold_cross_validation(inputs, targets):
     print('------------------------------------------------------------------------')
 
 
+# Code inspired from https://keras.io/guides/keras_tuner/getting_started/
+def build_model(hp):
+    model = models.Sequential()
+    # Tune the number of layers.
+    for i in range(hp.Int("num_layers", 1, 3)):
+        model.add(
+            layers.Dense(
+                # Tune number of units separately.
+                units=hp.Int(f"units_{i}", min_value=32, max_value=512, step=32),
+                activation="relu"
+            )
+        )
+    model.add(layers.Dense(units=1, activation="sigmoid"))
+    learning_rate = hp.Float("lr", min_value=1e-4, max_value=1e-2, sampling="log")
+    model.compile(
+        optimizer=optimizers.Nadam(learning_rate=learning_rate),
+        loss="binary_crossentropy",
+        metrics=["accuracy"],
+    )
+    return model
+
+
+def tune_hyperparameters(x_train, y_train, x_test, y_test):
+    build_model(keras_tuner.HyperParameters())
+    tuner = keras_tuner.RandomSearch(
+        hypermodel=build_model,
+        objective="val_accuracy",
+        max_trials=3,
+        executions_per_trial=2
+    )
+    tuner.search(x_train, y_train, epochs=10, validation_data=(x_test, y_test))
+
+
 if __name__ == '__main__':
     # load the document
     col_list = ["review", "sentiment"]
@@ -245,6 +290,7 @@ if __name__ == '__main__':
     # we clear the lists of positive/negative reviews in order to now load the test data
     positive_lines.clear()
     negative_lines.clear()
+    docs.clear()
     # load the test data
     process_test_data(text, vocabulary)
     docs = negative_lines + positive_lines
@@ -252,11 +298,13 @@ if __name__ == '__main__':
     x_test = tokenizer.texts_to_matrix(docs, mode='freq')
     y_test = array([0 for _ in range(1000)] + [1 for _ in range(1000)])
     features = x_test.shape[1]
+    # tune_hyperparameters(x_train, y_train, x_test, y_test)
     # perform the k-fold cross-validation
-    # k_fold_cross_validation(x_train, y_train)
+    k_fold_cross_validation(x_train, y_train)
     # load the best model
-    loaded_network = load_model('saved_model/4')
-    loaded_network.summary()
+    # loaded_network = load_model('saved_model/4')
+    # loaded_network.summary()
+    # history = loaded_network.fit(x_train, y_train, validation_data=(x_test, y_test),
+    #                         epochs=50)
+
     # test it using the test data.
-    loss, acc = loaded_network.evaluate(x_test, y_test, verbose=0)
-    print('accuracy: %f' % (acc * 100))
