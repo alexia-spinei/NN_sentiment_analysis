@@ -24,7 +24,8 @@ negative_lines = list()
 acc_per_fold = []
 loss_per_fold = []
 
-
+# NOTE: some function calls are commented as we only had to build the vocabulary, tune the hyperparameters and
+# cross-validate only once.
 def get_wordnet_pos(word):
     """Map POS tag to first character lemmatize() accepts"""
     tag = nltk.pos_tag([word])[0][1][0].upper()
@@ -36,13 +37,33 @@ def get_wordnet_pos(word):
     return tag_dict.get(tag, wordnet.NOUN)
 
 
-def plotgraph(history, string):
-    plt.plot(history.history[string], label='training ' + string)
-    plt.plot(history.history['val_' + string], label='validation ' + string)
+# Plot inspired from https://colab.research.google.com/github/tensorflow/hub/blob/master/examples/colab/tf2_text_classification.ipynb
+def plotgraph(history):
+    history_dict = history.history
+    history_dict.keys()
+    acc = history_dict['accuracy']
+    val_acc = history_dict['val_accuracy']
+    loss = history_dict['loss']
+    val_loss = history_dict['val_loss']
+    epochs = range(1, len(acc) + 1)
+    # "bo" is for "blue dot"
+    plt.plot(epochs, loss, 'bo', label='Training loss')
+    # b is for "solid blue line"
+    plt.plot(epochs, val_loss, 'b', label='Validation loss')
+    plt.title('Training and validation loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
     plt.legend()
-    plt.xlabel('epochs')
-    plt.ylabel(string)
-    plt.title(string + ' vs epochs')
+    plt.show()
+    plt.clf()  # clear figure
+
+    plt.plot(epochs, acc, 'bo', label='Training acc')
+    plt.plot(epochs, val_acc, 'b', label='Validation acc')
+    plt.title('Training and validation accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.legend()
+
     plt.show()
 
 
@@ -73,7 +94,7 @@ def decontracted(phrase):
 
     return phrase
 
-
+# Code inspired from https://www.kaggle.com/code/harshalgadhe/imdb-sentiment-classifier-97-accuracy-model/notebook
 def word_cloud(reviews):
     plt.figure(figsize=(10, 10))
     sentiment_text = ' '.join(reviews)
@@ -298,13 +319,21 @@ if __name__ == '__main__':
     x_test = tokenizer.texts_to_matrix(docs, mode='freq')
     y_test = array([0 for _ in range(1000)] + [1 for _ in range(1000)])
     features = x_test.shape[1]
+    # tune hyperparameters:
     # tune_hyperparameters(x_train, y_train, x_test, y_test)
     # perform the k-fold cross-validation
-    k_fold_cross_validation(x_train, y_train)
-    # load the best model
-    # loaded_network = load_model('saved_model/4')
-    # loaded_network.summary()
-    # history = loaded_network.fit(x_train, y_train, validation_data=(x_test, y_test),
-    #                         epochs=50)
-
-    # test it using the test data.
+    # k_fold_cross_validation(x_train, y_train)
+    network = models.Sequential()
+    network.add(layers.Dense(units=160, activation='relu', input_shape=(features,)))
+    network.add(layers.Dense(units=192, activation='relu'))
+    network.add(layers.Dense(units=1, activation='sigmoid'))
+    # Compile the model
+    network.compile(loss='binary_crossentropy', optimizer=optimizers.Nadam(learning_rate=0.00016116),
+                    metrics=['accuracy'])
+    history = network.fit(x_train, y_train, validation_data=(x_test, y_test),
+                             epochs=50)
+    # plot the accuracy and loss over each iteration
+    plotgraph(history)
+    # check the accuracy with the test data
+    loss, acc = network.evaluate(x_test,y_test, verbose = 0)
+    print('Test Accuracy: %f' % (acc * 100))
